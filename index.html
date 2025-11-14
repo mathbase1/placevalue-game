@@ -1,1 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Place-Value Builder</title>
 
+<style>
+:root{
+  --hundredth:#164e63; --tenth:#0e7490;  --one:#0284c7; --ten:#047857;
+  --hundred:#b91c1c;   --thousand:#be123c;--tenthousand:#9d174d;
+  --hundredk:#1d4ed8;  --million:#6d28d9; --surface:#1e293b;
+  --accent:#38bdf8;    --text:#f1f5f9;
+}
+*,*:before,*:after{box-sizing:border-box}
+body{
+  margin:0;min-height:100vh;padding:1.6rem;background:#0f172a;color:var(--text);
+  font-family:"Segoe UI",Verdana,Arial,sans-serif;
+  display:flex;flex-direction:column;align-items:center;gap:1.6rem;
+}
+h1{margin:0;color:var(--accent);font-size:clamp(1.8rem,5vw,2.5rem)}
+.info{display:flex;gap:2rem;flex-wrap:wrap;justify-content:center;font-size:1.05rem}
+.info span{font-weight:700}
+
+.block,.placed{
+  width:70px;height:70px;border-radius:10px;display:flex;justify-content:center;align-items:center;
+  font-weight:700;font-size:.9rem;color:var(--text);box-shadow:0 3px 6px rgba(0,0,0,.45);cursor:pointer
+}
+.bank{display:flex;flex-wrap:wrap;gap:1rem;justify-content:center}
+.hundredth{background:var(--hundredth)} .tenth{background:var(--tenth)} .one{background:var(--one)}
+.ten{background:var(--ten)} .hundred{background:var(--hundred)} .thousand{background:var(--thousand)}
+.tenthousand{background:var(--tenthousand)} .hundredk{background:var(--hundredk)} .million{background:var(--million)}
+
+.board{display:flex;gap:1.4rem;padding:1.5rem 1rem;background:var(--surface);border-radius:12px;
+       box-shadow:0 4px 14px rgba(0,0,0,.45);overflow-x:auto;max-width:100%}
+.slot{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;gap:.5rem}
+.slot-label{font-weight:700;white-space:nowrap}
+.drop-zone{width:120px;min-height:450px;border:3px dashed #475569;border-radius:8px;background:#0f172a;
+           display:flex;flex-wrap:wrap;align-content:flex-start;gap:.4rem;padding:.6rem}
+.placed{width:55px;height:55px;font-size:.8rem;border-radius:8px}
+
+.btn{padding:.7rem 1.6rem;border:none;border-radius:10px;background:var(--accent);
+     color:#0f172a;font-weight:700;font-size:1rem;cursor:pointer;transition:.15s}
+.btn:hover{transform:translateY(-2px)}
+#feedback{min-height:1.5rem;font-size:1.1rem;font-weight:700}
+
+/* ---------- overlay ---------- */
+#overlay{position:fixed;inset:0;background:rgba(15,23,42,.9);
+  display:flex;justify-content:center;align-items:center;z-index:999;color:var(--text)}
+.panel{background:var(--surface);padding:2rem 2.4rem;border-radius:12px;box-shadow:0 6px 20px rgba(0,0,0,.6);
+  display:flex;flex-direction:column;gap:1rem;width:92%;max-width:360px}
+.panel h2{margin:0;text-align:center;color:var(--accent)}
+label{font-weight:600}
+input[type="text"],input[type="number"]{width:100%;padding:.55rem;border:none;border-radius:8px;margin-top:.25rem}
+.group{display:none;flex-direction:column;gap:.4rem;margin-left:.7rem}
+.group.active{display:flex}
+</style>
+</head>
+<body>
+
+<!-- ===== overlay ===== -->
+<div id="overlay">
+  <div class="panel">
+    <h2>Start Game</h2>
+
+    <label>Name</label>
+    <input id="nameInput" type="text" placeholder="Enter your name"/>
+
+    <label>Mode</label>
+    <label><input type="radio" name="mode" value="timer" checked> Timed game</label>
+    <label><input type="radio" name="mode" value="target"> Target-score game</label>
+
+    <div id="timerGroup" class="group active">
+      <label><input type="radio" name="timer" value="300"> 5 min</label>
+      <label><input type="radio" name="timer" value="600" checked> 10 min</label>
+      <label><input type="radio" name="timer" value="900"> 15 min</label>
+      <label><input type="radio" name="timer" value="none"> No limit</label>
+    </div>
+
+    <div id="scoreGroup" class="group">
+      <label for="scoreInput">Target score</label>
+      <input id="scoreInput" type="number" min="1" placeholder="e.g. 20"/>
+    </div>
+
+    <button class="btn" onclick="begin()">Start</button>
+  </div>
+</div>
+
+<h1>Place-Value Builder</h1>
+
+<div class="info">
+  <div>👤 <span id="playerName">—</span></div>
+  <div>⏱ <span id="timer">--:--</span></div>
+  <div>🎯 Num&nbsp;<span id="targetNum">—</span></div>
+  <div>⭐ Score&nbsp;<span id="score">0</span></div>
+  <div>🏆 Goal&nbsp;<span id="goal">—</span></div>
+</div>
+
+<!-- bank -->
+<div class="bank" id="bank">
+  <div class="block hundredth" data-value="0.01">0.01</div>
+  <div class="block tenth"      data-value="0.1">0.1</div>
+  <div class="block one"        data-value="1">1</div>
+  <div class="block ten"        data-value="10">10</div>
+  <div class="block hundred"    data-value="100">100</div>
+  <div class="block thousand"   data-value="1000">1k</div>
+  <div class="block tenthousand"data-value="10000">10k</div>
+  <div class="block hundredk"   data-value="100000">100k</div>
+  <div class="block million"    data-value="1000000">1M</div>
+</div>
+
+<!-- board -->
+<div class="board">
+  <div class="slot"><div class="slot-label">Millions</div>        <div class="drop-zone" id="z-1000000"></div></div>
+  <div class="slot"><div class="slot-label">Hund-Thousands</div>  <div class="drop-zone" id="z-100000"></div></div>
+  <div class="slot"><div class="slot-label">Ten-Thousands</div>   <div class="drop-zone" id="z-10000"></div></div>
+  <div class="slot"><div class="slot-label">Thousands</div>       <div class="drop-zone" id="z-1000"></div></div>
+  <div class="slot"><div class="slot-label">Hundreds</div>        <div class="drop-zone" id="z-100"></div></div>
+  <div class="slot"><div class="slot-label">Tens</div>            <div class="drop-zone" id="z-10"></div></div>
+  <div class="slot"><div class="slot-label">Ones</div>            <div class="drop-zone" id="z-1"></div></div>
+  <div class="slot"><div class="slot-label">Tenths</div>          <div class="drop-zone" id="z-0.1"></div></div>
+  <div class="slot"><div class="slot-label">Hundredths</div>      <div class="drop-zone" id="z-0.01"></div></div>
+</div>
+
+<button class="btn" onclick="checkNum()">Check</button>
+<div id="feedback"></div>
+
+<script>
+/* toggle groups based on mode radio */
+document.querySelectorAll('input[name="mode"]').forEach(r=>{
+  r.onchange=()=>{
+    document.getElementById("timerGroup").classList.toggle("active",r.value==="timer");
+    document.getElementById("scoreGroup").classList.toggle("active",r.value==="target");
+  };
+});
+
+/* ---------- state ---------- */
+let score=0, goal=null, time=null, tick=null, target=0;
+const totals={"0.01":0,"0.1":0,"1":0,"10":0,"100":0,"1000":0,"10000":0,"100000":0,"1000000":0};
+const classes={0.01:"hundredth",0.1:"tenth",1:"one",10:"ten",100:"hundred",1000:"thousand",10000:"tenthousand",100000:"hundredk",1000000:"million"};
+const zones={};Object.keys(classes).forEach(v=>zones[v]=document.getElementById(`z-${v}`));
+
+/* map each value to its next higher denomination (no mapping for 1M) */
+const nextValueMap={0.01:0.1,0.1:1,1:10,10:100,100:1000,1000:10000,10000:100000,100000:1000000};
+
+/* helper to create a placed block element */
+function createBlock(val){
+  const el=document.createElement("div");
+  el.className=`placed ${classes[val]}`;
+  el.dataset.value=val;
+  el.textContent=val<1?val.toFixed(2):
+               val>=1000000?"1M":
+               val>=100000?"100k":
+               val>=10000?"10k":
+               val>=1000?"1k":val;
+  el.onclick=function(){
+    totals[val]-=val;
+    this.parentElement.removeChild(this);
+  };
+  return el;
+}
+
+/* carry/upgrade logic: whenever 10 blocks are in a column, convert to 1 in the next column */
+function handleCarry(val){
+  if(val===1000000) return; // no carry beyond millions
+  const zone=zones[val];
+  const nextVal=nextValueMap[val];
+  if(!nextVal) return;
+
+  while(zone.children.length>=10){
+    // remove 10 blocks from current zone
+    for(let i=0;i<10;i++){
+      zone.removeChild(zone.firstChild);
+    }
+    totals[val]-=val*10;
+
+    // limit millions column to max 10 blocks
+    if(nextVal===1000000 && zones[nextVal].children.length>=10){
+      alert("🚫 The millions column is limited to 10 blocks.");
+      return;
+    }
+
+    // add one block to next zone
+    totals[nextVal]+=nextVal;
+    zones[nextVal].appendChild(createBlock(nextVal));
+
+    // recursively check if the next zone now needs carrying
+    handleCarry(nextVal);
+  }
+}
+
+function begin(){
+  /* read selections */
+  const mode=document.querySelector('input[name="mode"]:checked').value;
+  const name=document.getElementById("nameInput").value.trim()||"Player";
+  document.getElementById("playerName").textContent=name;
+
+  if(mode==="timer"){
+    const tChoice=document.querySelector('input[name="timer"]:checked').value;
+    time=tChoice==="none"?null:parseInt(tChoice,10);
+    document.getElementById("goal").textContent="—";
+    updateTimer(); if(time!==null)startTimer();
+  }else{
+    const g=parseInt(document.getElementById("scoreInput").value,10);
+    if(isNaN(g)||g<1){alert("Enter a positive target score.");return}
+    goal=g; document.getElementById("goal").textContent=goal;
+    time=null; document.getElementById("timer").textContent="∞";
+  }
+
+  document.getElementById("overlay").style.display="none";
+  enableClicks(); newTarget();
+}
+
+/* timer helpers */
+function updateTimer(){
+  if(time===null){document.getElementById("timer").textContent="∞";return}
+  const m=Math.floor(time/60),s=time%60;
+  document.getElementById("timer").textContent=`${m}:${s<10?"0"+s:s}`;
+}
+function startTimer(){
+  tick=setInterval(()=>{
+    if(--time<0){clearInterval(tick);alert("⏰ Time's up! Final score: "+score);}else updateTimer();
+  },1000);
+}
+
+/* new target number */
+function newTarget(){
+  const cents=Math.floor(Math.random()*999999999)+1;
+  target=cents/100;
+  document.getElementById("targetNum").textContent=
+    target.toLocaleString(undefined,{minimumFractionDigits:2});
+}
+
+/* enable bank clicks */
+function enableClicks(){
+  document.querySelectorAll('#bank .block').forEach(b=>{
+    b.onclick=()=>{
+      const v=parseFloat(b.dataset.value);
+      // enforce the 10‑million limit
+      if(v===1000000 && zones[v].children.length>=10){
+        alert("🚫 The millions column is limited to 10 blocks.");
+        return;
+      }
+      totals[v]+=v;
+      zones[v].appendChild(createBlock(v));
+      handleCarry(v);
+    };
+  });
+}
+
+/* check answer */
+function checkNum(){
+  const sum=Object.values(totals).reduce((s,v)=>s+v,0);
+  document.getElementById("feedback").textContent=
+    Math.abs(sum-target)<0.005?"✅ Correct!":"❌ Try again!";
+  if(Math.abs(sum-target)<0.005){score++;document.getElementById("score").textContent=score;
+    if(goal!==null&&score>=goal){alert("🏆 Target score reached!");goal=null;document.getElementById("goal").textContent="—";}
+  }
+  for(const k in totals){totals[k]=0;}
+  Object.values(zones).forEach(z=>z.innerHTML="");
+  newTarget();
+}
+</script>
+</body>
+</html>
